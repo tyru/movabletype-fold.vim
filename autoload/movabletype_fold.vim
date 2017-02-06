@@ -41,20 +41,12 @@ endfunction
 
 function! movabletype_fold#toggle() abort
   if !exists('b:movable_type_fold')
-    " b:movable_type_fold.versions = {
-    "   "<version>" : {
-    "     cache_lnum: [
-    "       { from: <from>, to: <to>, foldlevel: <foldlevel(integer)> }
-    "     ],
-    "     cache_content: [ <lines of current version of buffer> ]
-    "   }
-    " }
     echo 'Caching...'
     let b:movable_type_fold = {
     \ 'foldmethod': &foldmethod,
     \ 'foldexpr': &foldexpr,
     \ 'foldtext': &foldtext,
-    \ 'versions': {}
+    \ 'version': ''
     \}
     setlocal foldmethod=expr
     setlocal foldexpr=movabletype_fold#foldexpr(v:lnum)
@@ -70,17 +62,31 @@ function! movabletype_fold#toggle() abort
   endif
 endfunction
 
+" b:movable_type_fold = {
+"   ...,
+"   cache_lnum: [
+"     { from: <from>, to: <to>, foldlevel: <foldlevel(integer)> }
+"   ],
+"   cache_content: [ <lines of current version of buffer> ]
+" }
+" NOTE: This affects `b:movable_type_fold.cache_*` variables.
+function! s:init_movable_type_fold(ver) abort
+  let b:movable_type_fold.cache_content = getline(1, '$')
+  let b:movable_type_fold.cache_lnum = []
+  let b:movable_type_fold.version = a:ver
+endfunction
+
 " Get current version of entry.
-" NOTE: This affects `b:movable_type_fold.versions` cache.
+" NOTE: This affects `b:movable_type_fold.cache_*` variables.
 function! s:get_entry_by_lnum(lnum) abort
   let ver = s:get_file_version()
-  if !has_key(b:movable_type_fold.versions, ver)
+  if b:movable_type_fold.version !=# ver
     call s:init_movable_type_fold(ver)
     let entry = s:parse_section(s:get_content(), a:lnum)
-    let b:movable_type_fold.versions[ver].cache_lnum += [entry]
+    let b:movable_type_fold.cache_lnum += [entry]
     return entry
   endif
-  let entries = b:movable_type_fold.versions[ver].cache_lnum
+  let entries = b:movable_type_fold.cache_lnum
   let res = s:bsearch_index(entries, a:lnum)
   if res.found
     return entries[res.index]
@@ -91,21 +97,13 @@ function! s:get_entry_by_lnum(lnum) abort
   endif
 endfunction
 
-" NOTE: This affects `b:movable_type_fold.versions` cache.
+" NOTE: This affects `b:movable_type_fold.cache_*` variables.
 function! s:get_content() abort
   let ver = s:get_file_version()
-  if !has_key(b:movable_type_fold.versions, ver)
+  if b:movable_type_fold.version !=# ver
     call s:init_movable_type_fold(ver)
   endif
-  return b:movable_type_fold.versions[ver].cache_content
-endfunction
-
-" NOTE: This affects `b:movable_type_fold.versions` cache.
-function! s:init_movable_type_fold(ver) abort
-  let b:movable_type_fold.versions[a:ver] = {
-  \ 'cache_content': getline(1, '$'),
-  \ 'cache_lnum': []
-  \}
+  return b:movable_type_fold.cache_content
 endfunction
 
 function! s:add_entry(entries, entry) abort
